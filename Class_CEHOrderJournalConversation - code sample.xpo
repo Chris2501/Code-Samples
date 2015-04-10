@@ -1,0 +1,348 @@
+﻿Exportfile for AOT version 1.0 or later
+Formatversion: 1
+
+***Element: CLS
+
+; Microsoft Dynamics AX Class: CEHOrderJournalConversation unloaded
+; --------------------------------------------------------------------------------
+  CLSVERSION 1
+  
+  CLASS #CEHOrderJournalConversation
+    PROPERTIES
+      Name                #CEHOrderJournalConversation
+      Origin              #{22722976-F357-49D9-8222-CD02137E24ED}
+    ENDPROPERTIES
+    
+    METHODS
+      SOURCE #classDeclaration
+        #class CEHOrderJournalConversation
+        #{
+        #}
+      ENDSOURCE
+      SOURCE #convertItemToWaxDim
+        #public void convertItemToWaxDim()
+        #{
+        #    EcoResStorageDimensionGroupItem     storageDim;
+        #    CEHInventTable                      CEHInventTable;
+        #    boolean                             canConvert;
+        #    InventTrans                         inventTrans;
+        #    PurchLine                           purchLine;
+        #    inventTrans                         inventTransOrigin;
+        #    int                                 numCount;
+        #    ;
+        #
+        #
+        #    ttsBegin;
+        #
+        #    while select CEHInventTable
+        #        Where CEHInventTable.CEHConvToWax == true
+        #    {
+        #
+        #        while select forUpdate storageDim
+        #            where storageDim.ItemId == CEHInventTable.ItemId
+        #        {
+        #            
+        #            storageDim.StorageDimensionGroup = 5637144830;
+        #            storageDim.update();
+        #
+        #            numCount++;
+        #
+        #            CEHInventTable.CEHConvToWax = false;
+        #            CEHInventTable.update();
+        #        }
+        #
+        #
+        #        canConvert = true;
+        #
+        #        while select inventTrans
+        #            join purchLine
+        #            join inventTransOrigin
+        #            where   inventTrans.InventTransOrigin   == inventTransOrigin.RecId          &&
+        #                    purchLine.InventTransId         == inventTransOrigin.InventTransId  &&
+        #                    purchLine.PurchId               == purchTable.PurchId
+        #        {
+        #            if (canConvert && (inventTrans.StatusIssue >= 4 || inventTrans.StatusIssue <= 1))
+        #            {
+        #                //Continue;
+        #            }
+        #
+        #            Else
+        #            {
+        #                canConvert = false;
+        #
+        #                info(strFmt("%1 : %2",purchLine.PurchId,purchLine.RecId)); // this will throw an info log for each line that has open transactions
+        #            }
+        #        }
+        #
+        #        If (canConvert)
+        #        {
+        #            CEHPurchTable.selectForUpdate(true);
+        #            CEHPurchTable.CEHConvJour = NoYes::Yes;
+        #            CEHPurchTable.update();
+        #
+        #            purchTable.PurchaseType = PurchaseType::Purch;
+        #            purchTable.update();
+        #        }
+        #    }
+        #
+        #    ttsCommit;
+        #
+        #    info(strFmt('number of item dims switched: %1',numCount));
+        #}
+      ENDSOURCE
+      SOURCE #convertToJournal
+        #public void convertToJournal()
+        #{
+        #    ttsBegin;
+        #
+        #    info('Sales Orders Start');
+        #    this.convertToJournalSales();
+        #    info('Sales Orders End');
+        #
+        #    info('Pruch Orders Start');
+        #    this.convertToJournalPurch();
+        #    info('Purch Orders End');
+        #
+        #    ttsCommit;
+        #}
+      ENDSOURCE
+      SOURCE #convertToJournalPurch
+        #public void convertToJournalPurch()
+        #{
+        #    PurchTable          purchTable;
+        #    InventTrans         inventTrans;
+        #    PurchLine           purchLine;
+        #    InventTransOrigin   inventTransOrigin;
+        #    CEHPurchTable       CEHPurchTable;
+        #    boolean             canConvert;
+        #    CEHInventTable      CEHInventTable;
+        #    boolean             errorHit;
+        #    CEHTempTable        CEHTempTable;
+        #    ;
+        #
+        #    ttsBegin;
+        #
+        #    while select forUpdate PurchaseType, PurchId from purchTable
+        #        join CEHPurchTable
+        #        Where purchTable.PurchStatus     ==   1             &&
+        #              (purchTable.PurchaseType   ==   3             ||
+        #               purchTable.purchaseType   ==   4)             &&
+        #               CEHPurchTable.PurchId     == purchTable.PurchId
+        #    {
+        #        canConvert = false;
+        #        errorHit = false;
+        #
+        #        while select StatusReceipt from inventTrans
+        #            join purchLine
+        #            join inventTransOrigin
+        #            where   inventTrans.InventTransOrigin   == inventTransOrigin.RecId          &&
+        #                    purchLine.InventTransId         == inventTransOrigin.InventTransId  &&
+        #                    purchLine.PurchId               == purchTable.PurchId
+        #        {
+        #            CEHInventTable = CEHInventTable::find(purchLine.ItemId, true);
+        #
+        #            if (inventTrans.StatusReceipt == 5 || (purchTable.PurchaseType == PurchaseType::ReturnItem && inventTrans.StatusIssue >= 4))
+        #            {
+        #                canConvert = CEHInventTable.CEHConvToWax ? true : false;
+        #                Continue;
+        #            }
+        #
+        #            Else
+        #            {
+        #                canConvert = false;
+        #                errorHit = true;
+        #
+        #                //info(strFmt("Item: %1, Order: %2, Dlv Date: %3",purchLine.ItemId,purchLine.PurchId,purchLine.RecId)); // this will throw an info log for each line that has open transactions
+        #
+        #                ttsBegin;
+        #                CEHTempTable.ItemId         = purchLine.ItemId;
+        #                CEHTempTable.OrderId        = purchLine.PurchId;
+        #                CEHTempTable.DeliveryDate   = purchLine.DeliveryDate;
+        #                CEHTempTable.insert();
+        #                ttsCommit;
+        #
+        #                if (CEHInventTable.CEHConvToWax)
+        #                {
+        #                    ttsBegin;
+        #                    CEHInventTable.selectForUpdate(true);
+        #                    CEHInventTable.CEHConvToWax = false;
+        #                    CEHInventTable.update();
+        #                    ttsCommit;
+        #                }
+        #            }
+        #        }
+        #
+        #        If (canConvert && !errorHit)
+        #        {
+        #            CEHPurchTable.selectForUpdate(true);
+        #            CEHPurchTable.CEHConvJour = NoYes::Yes;
+        #            CEHPurchTable.PurchaseType = purchTable.PurchaseType;
+        #            CEHPurchTable.update();
+        #
+        #            purchLine.selectForUpdate(true);
+        #            purchTable.PurchaseType = PurchaseType::Journal;
+        #            info(strFmt('purchId:%1, ItemId:%2, PruchLine Recid:%3',purchTable.PurchId,purchLine.ItemId,purchLine.RecId));
+        #            purchTable.update();
+        #        }
+        #    }
+        #
+        #    ttsCommit;
+        #}
+      ENDSOURCE
+      SOURCE #convertToJournalSales
+        #public void convertToJournalSales()
+        #{
+        #    SalesTable          salesTable;
+        #    InventTrans         inventTrans;
+        #    SalesLine           salesLine;
+        #    InventTransOrigin   inventTransOrigin;
+        #    CEHSalesTable       CEHSalesTable;
+        #    boolean             canConvert;
+        #    CEHInventTable      CEHInventTable;
+        #    boolean             errorHit;
+        #    CEHTempTable        CEHTempTable;
+        #    ;
+        #
+        #    ttsBegin;
+        #
+        #    while select forUpdate SalesType, SalesId from salesTable
+        #        join CEHSalesTable
+        #        Where salesTable.SalesStatus    < 3                 &&
+        #              salesTable.SalesType      > 0                 &&
+        #              //salesTable.SalesId        == '303871'         &&
+        #              CEHSalesTable.SalesId     == salesTable.SalesId
+        #    {
+        #        canConvert = false;
+        #        errorHit = false;
+        #
+        #        while select StatusIssue from inventTrans
+        #            join salesLine
+        #            join inventTransOrigin
+        #            where   inventTrans.InventTransOrigin   == inventTransOrigin.RecId          &&
+        #                    salesLine.InventTransId         == inventTransOrigin.InventTransId  &&
+        #                    salesLine.SalesId               == salesTable.SalesId
+        #        {
+        #            CEHInventTable = CEHInventTable::find(salesLine.ItemId, true);
+        #
+        #            If (inventTrans.StatusIssue >= 4 || (salesTable.SalesType == SalesType::ReturnItem && inventTrans.StatusReceipt == 5))
+        #            {
+        #                canConvert = CEHInventTable.CEHConvToWax ? true : false;
+        #                Continue;
+        #            }
+        #
+        #            Else
+        #            {
+        #                canConvert  = false;
+        #                errorHit    = true;
+        #
+        #                warning(strFmt("Item: %1, Order: %2, Dlv Date: %3",salesLine.ItemId,salesLine.SalesId,salesLine.deliveryDate())); // this will throw an info log for each line that has open transactions
+        #
+        #                ttsBegin;
+        #                CEHTempTable.ItemId         = salesLine.ItemId;
+        #                CEHTempTable.OrderId        = salesLine.SalesId;
+        #                CEHTempTable.DeliveryDate   = salesLine.ShippingDateConfirmed;
+        #                CEHTempTable.insert();
+        #                ttsCommit;
+        #
+        #                if (CEHInventTable.CEHConvToWax)
+        #                {
+        #                    ttsBegin;
+        #                    CEHInventTable.selectForUpdate(True);
+        #                    CEHInventTable.CEHConvToWax = false;
+        #                    CEHInventTable.update();
+        #                    ttsCommit;
+        #                }
+        #            }
+        #        }
+        #
+        #        If (canConvert && !errorHit)
+        #        {
+        #            CEHSalesTable.selectForUpdate(true);
+        #            CEHSalesTable.CEHConvJour = NoYes::Yes;
+        #            CEHSalesTable.SalesType = salesTable.SalesType;
+        #            CEHSalesTable.update();
+        #
+        #            salesTable.SalesType = SalesType::Journal;
+        #            info(strFmt('SalesId:%1, ItemId:%2, SalesLine RecId:%3',salesTable.SalesId,salesLine.ItemId,salesLine.RecId));
+        #            salesTable.update();
+        #        }
+        #    }
+        #
+        #    ttsCommit;
+        #}
+      ENDSOURCE
+      SOURCE #revertToOrderType
+        #public void revertToOrderType()
+        #{
+        #    this.revertToOrderTypeSales();
+        #    this.revertToOrderTypePurch();
+        #}
+      ENDSOURCE
+      SOURCE #revertToOrderTypePurch
+        #public void revertToOrderTypePurch()
+        #{
+        #    PurchTable          purchTable;
+        #    CEHPurchTable       CEHPurchTable;
+        #    int                 numRec;
+        #    str                 x;
+        #    ;
+        #
+        #    ttsBegin;
+        #
+        #    while select forUpdate purchTable
+        #        join CEHPurchTable
+        #        where CEHPurchTable.CEHConvJour == true                     &&
+        #                purchTable.PurchId      == CEHPurchTable.PurchId
+        #    {
+        #        
+        #        purchTable.PurchaseType = CEHPurchTable.PurchaseType;
+        #        purchTable.update();
+        #
+        #        CEHPurchTable.selectForUpdate(true);
+        #        CEHPurchTable.CEHConvJour = NoYes::No;
+        #        CEHPurchTable.update();
+        #        numRec++;
+        #        
+        #    }
+        #
+        #    ttsCommit;
+        #
+        #    info(strFmt('Number of purchase orders reverted: %1',numRec));
+        #}
+      ENDSOURCE
+      SOURCE #revertToOrderTypeSales
+        #public void revertToOrderTypeSales()
+        #{
+        #    SalesTable          salesTable;
+        #    CEHSalesTable       CEHSalesTable;
+        #    int                 numRec;
+        #    str                 x;
+        #    ;
+        #
+        #    ttsBegin;
+        #
+        #    while select forUpdate salesTable
+        #        join CEHSalesTable
+        #        where CEHSalesTable.CEHConvJour == true                     &&
+        #              salesTable.SalesId        == CEHSalesTable.SalesId
+        #    {
+        #        
+        #        salesTable.SalesType = CEHSalesTable.SalesType;
+        #        salesTable.update();
+        #        CEHSalesTable.selectForUpdate(true);
+        #        CEHSalesTable.CEHConvJour = NoYes::No;
+        #        CEHSalesTable.update();
+        #        numRec++;
+        #        
+        #    }
+        #
+        #    ttsCommit;
+        #
+        #    info(strFmt('Number of sales orders reverted: %1',numRec));
+        #    
+        #}
+      ENDSOURCE
+    ENDMETHODS
+  ENDCLASS
+
+***Element: END

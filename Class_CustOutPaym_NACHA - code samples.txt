@@ -1,0 +1,37 @@
+/// <summary>
+///    Writes the ACH Transmission record to the output file.
+/// </summary>
+/// <returns>
+///    A container that contains the ACH Transmission record.
+/// </returns>
+// Writes the ACH Transmission record to the output file.
+protected container createTransmissionHeaderRecord()
+{
+    container   transmissionACH             =   conNull();
+  
+    #define.requestType('$$ADD ID=')
+	#define.remoteID('0z0z0z0z')
+    #define.spc(' ')
+    #define.batchIdParam('BID=')
+    #define.qoute('\'')
+    #define.fileType('CEHACH')
+    #define.appId('09876543')
+                                                                        // Offset           Hardcoded       Value
+    str 9       requestType                 =   #requestType;           // 01 - 09          $$ADD ID=
+    str 8       remoteID                    =   #remoteID;              // 10 - 17          0z0z0z0z
+    str 1       spaceBlank                  =   #spc;                   // 18 - 18          sinlge space
+    str 4       batchIdParam                =   #batchIdParam;          // 19 - 22          BID=
+    str 1       startQoute                  =   #qoute;                 // 23 - 23          starting qoute
+    str 6       fileType                    =   #fileType;              // 24 - 29          CEHACH
+    str 8       applicationID               =   #appId;                 // 30 - 37          09876543
+    str 1       endQoute                    =   #qoute;                 // 38 - 38          ending qoute
+
+
+    transmissionACH = conIns(transmissionACH,1, requestType + remoteID + spaceBlank + batchIdParam +
+                                startQoute + fileType + applicationID + endQoute);
+
+    this.addTransmissionRecord();
+
+    return transmissionACH;
+
+}

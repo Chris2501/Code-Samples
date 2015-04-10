@@ -1,0 +1,232 @@
+﻿Exportfile for AOT version 1.0 or later
+Formatversion: 1
+
+***Element: CLS
+
+; Microsoft Dynamics AX Class: VendOutPaymRecord_CHBPayPlus unloaded
+; --------------------------------------------------------------------------------
+  CLSVERSION 1
+  
+  CLASS #VendOutPaymRecord_CHBPayPlus
+    PROPERTIES
+      Name                #VendOutPaymRecord_CHBPayPlus
+      Extends             #VendOutPaymRecord
+      RunOn               #Server
+      Origin              #{EAEB45B9-4F21-4F9B-92D2-D77D24B93FA3}
+    ENDPROPERTIES
+    
+    METHODS
+      SOURCE #checkValues
+        #// Methods was causing compile error. had to add = null in method parameters.
+        #// Begin Mod
+        #//public boolean checkValues(LedgerJournalTrans _ledgerJournalTrans, RunbaseProgress _runbaseProgress)
+        #public boolean checkValues(LedgerJournalTrans _ledgerJournalTrans     = null,
+        #                           RunbaseProgress    _progress               = null)
+        #// End Mod
+        #{
+        #    
+        #    // Updating parameter names.
+        #    // Begin Mod
+        #    //boolean             ret = super(_ledgerJournalTrans, _runbaseProgress);
+        #    boolean             ret = super(_ledgerJournalTrans, _progress);
+        #    // End Mod
+        #
+        #    return ret;
+        #}
+      ENDSOURCE
+      SOURCE #classDeclaration
+        #class VendOutPaymRecord_CHBPayPlus extends VendOutPaymRecord
+        #{
+        #    container   record;
+        #    boolean     endOfText;
+        #
+        #    #define.PosPayRecLen(1800)
+        #    #define.RoutingNumLength(8)
+        #
+        #    container               posPay_Record;
+        #    str #PosPayRecLen       outputRecord;
+        #    AmountCur               transactionAmount;
+        #    VendBankAccount         vendBankAccount;
+        #
+        #}
+      ENDSOURCE
+      SOURCE #generateTraceNumber
+        #// Trace Number
+        #//
+        #// This is a number that we can use to attempt to uniquely identify the transaction.
+        #
+        #public str generateTraceNumber()
+        #{
+        #    #define.MaxJournalNumLength(11)
+        #    #define.MaxLen(15)
+        #    #define.MinSeqLen(4)
+        #
+        #    str                     journalNumber;
+        #    str                     lineNumber;
+        #    int                     strLength;
+        #    BankAccountTable        bankAccountTable; 
+        #
+        #
+        #    journalNumber = custVendPaym.ledgerJournalTrans().JournalNum;
+        #
+        #    strLength = strlen(journalNumber);
+        #
+        #    if (strLength <= #MaxJournalNumLength)
+        #    {
+        #        // If the length of the Journal Number is less than 12 characters,
+        #        // then we can use four or more characters from the line number:
+        #        lineNumber = num2Str0(custVendOutPaym.getNextSequenceNumber(), #MaxLen);
+        #        lineNumber = substr(lineNumber, strLength + 1, #MaxLen - strLength);
+        #    }
+        #    else
+        #    {
+        #        // If the length of the Journal Number is greater than 11 characters,
+        #        // we need to shorten the Journal Number (use right-most characters)
+        #        // to allow for four characters from the line number:
+        #        journalNumber = substr(journalNumber, strLength - 10, #MaxJournalNumLength);
+        #        lineNumber = num2Str0(custVendOutPaym.getNextSequenceNumber(), #MaxLen);
+        #        lineNumber = substr(lineNumber, #MaxJournalNumLength + 1, #MinSeqLen);
+        #    }
+        #
+        #    
+        #    return  subStr(bankAccountTable.RegistrationNum, 0, 8) + strRFix(lineNumber, 7, "0");
+        #    
+        #}
+      ENDSOURCE
+      SOURCE #initRecord
+        #protected void initRecord()
+        #{
+        #    int       i;
+        #
+        #    #define.nullStr('')
+        #
+        #
+        #    record = connull();
+        #
+        #    for (i = 1; i <= #PosPayRecLen; i++)
+        #    {
+        #        record += #nullStr;
+        #    }
+        #}
+      ENDSOURCE
+      SOURCE #output
+        #public void outPut()
+        #{
+        #    container           detailPosPay   = connull();
+        #
+        #    #define.recTypeCode('07')
+        #    #define.AccountCode('1111111111111111')
+        #    #define.MatchKey('                ')
+        #    #define.zero('0')
+        #    #define.spc(' ')
+        #                                                                        // Offset           Hardcoded       Value
+        #    str 2       recordTypeCode              =   #recTypeCode;           // 01 - 02          00
+        #    str 16      accountCode                 =   #AccountCode;           // 03 - 18          0000000000000000
+        #    str 8       hdrDate                     =   strrep(#zero, 8);       // 19 - 26                          Earliest date in file
+        #    str 16      matchKey                    =   #MatchKey;              // 27 - 42          #, left justified, blank filled
+        #    str 6       seqNumber                   =   strrep(#zero, 6);       // 43 - 48          start at 1; increment by 1 for each 01 record
+        #    str 6       recordContents              =   strrep(#zero, 6);       // 49 - 54          000000
+        #
+        #    str 50      filler                      =   strrep(#spc, 50);
+        #    str 25      vendInvoice;
+        #    str 39      filler2                     =   strrep(#spc, 39);
+        #    str 12      zeroes                      =   strrep(#zero, 12);
+        #    str 12      filler3                     =   strrep(#spc, 12);
+        #    str 12      zeroes2                     =   strrep(#zero, 12);
+        #    str 12      zeroes3                     =   '+00000000000';
+        #    str 4       zeroes4                     =   strrep(#zero, 4);
+        #    str 12      zeroes5                     =   '+00000000000';
+        #    str 1       sign;
+        #    str 11      amount;
+        #    str 201     filler4                     =   strrep(#spc, 201);
+        #    str 50      custLine1;
+        #    str 470     filler5                     =   strrep(#spc, 470);
+        #    str 835     filler6                     =   strrep(#spc, 835);
+        #
+        #    LedgerJournalTrans      ledgerJournalTrans_local;
+        #    TmpCustVendTrans        tmpCustVendTrans;
+        #    Int                     recSeq;
+		#    VendOutPaym_CHBPayPlus      vendOutPaym_PosPay;
+        #    ledgerJournalTrans_local = custVendPaym.ledgerJournalTrans();
+        #
+        #    vendOutPaym_PosPay = this.GetCustVendOutPaym();
+        #
+        #    recSeq = 0;
+        #
+        #    tmpCustVendTrans = CustVendFindSettlements::findMarkedTrans(ModuleCustVend::Vend, ledgerJournalTrans_local.Company, ledgerJournalTrans_local.TableId, ledgerJournalTrans_local.RecId);
+        #    while select tmpCustVendTrans
+        #    {
+        #        detailPosPay = connull();
+        #        hdrDate = date2str(systemdateget(), 213, 2, 0, 2, 0, 4);   // MMDDYYYY
+        #
+        #        matchKey = strLFix(ledgerJournalTrans_local.Voucher, 16);
+        #        seqNumber = int2str(vendOutPaym_PosPay.getSequenceNumber());
+        #        switch (strlen(seqNumber))
+        #        {
+        #            case 0 : seqNumber = '000000'; break;
+        #            case 1 : seqNumber = '00000' + seqNumber; break;
+        #            case 2 : seqNumber = '0000' + seqNumber; break;
+        #            case 3 : seqNumber = '000' + seqNumber; break;
+        #            case 4 : seqNumber = '00' + seqNumber; break;
+        #            case 5 : seqNumber = '0' + seqNumber; break;
+        #        }
+        #
+        #        recSeq++;
+        #        recordContents = int2str(recSeq);
+        #        switch (strlen(recordContents))
+        #        {
+        #            case 0 : recordContents = '000000'; break;
+        #            case 1 : recordContents = '00000' + recordContents; break;
+        #            case 2 : recordContents = '0000' + recordContents; break;
+        #            case 3 : recordContents = '000' + recordContents; break;
+        #            case 4 : recordContents = '00' + recordContents; break;
+        #            case 5 : recordContents = '0' + recordContents; break;
+        #        }
+        #
+        #        vendInvoice = strLFix(tmpCustVendTrans.Invoice, 25);
+        #        if ((-1 * tmpCustVendTrans.AmountCur) >= 0)
+        #        {
+        #            sign = '+';
+        #            amount = num2str0((-1 * tmpCustVendTrans.AmountCur) * 100, 11, 0);
+        #        }
+        #        else
+        #        {
+        #            sign = '-';
+        #            amount = num2str0(tmpCustVendTrans.AmountCur * 100, 11, 0);
+        #        }
+        #
+        #        custLine1 = strLFix(date2str(tmpCustVendTrans.TransDate, 213, 2, 4, 2, 4, 4), 50);   // MM/DD/YYYY
+        #
+        #        detailPosPay = conins(detailPosPay, 1, recordTypeCode + accountCode + hdrDate
+        #                            + matchKey + seqNumber + recordContents
+        #                            + filler
+        #                            + vendInvoice
+        #                            + filler2
+        #                            + zeroes
+        #                            + filler3
+        #                            + zeroes2
+        #                            + zeroes3
+        #                            + zeroes4
+        #                            + zeroes5
+        #                            + sign
+        #                            + amount
+        #                            + filler4
+        #                            + custLine1
+        #                            + filler5
+        #                            + filler6);
+        #
+        #        file.writeExp(detailPosPay);
+        #    }
+        #}
+      ENDSOURCE
+      SOURCE #strInsert
+        #protected void strInsert(str _fieldValue, int _fieldPosition)
+        #{
+        #
+        #    outputRecord = strpoke(outputRecord, _fieldValue, _fieldPosition);
+        #}
+      ENDSOURCE
+    ENDMETHODS
+  ENDCLASS
+
+***Element: END
