@@ -1,0 +1,82 @@
+﻿Exportfile for AOT version 1.0 or later
+Formatversion: 1
+
+***Element: CLS
+
+; Microsoft Dynamics AX Class: CEHVendOutPaymRecordWireTransfer unloaded
+; --------------------------------------------------------------------------------
+  CLSVERSION 1
+  
+  CLASS #CEHVendOutPaymRecordWireTransfer
+    PROPERTIES
+      Name                #CEHVendOutPaymRecordWireTransfer
+      Extends             #VendOutPaymRecord
+      RunOn               #Server
+      Origin              #{7918F095-7085-40D7-9CF3-A379EF17915E}
+    ENDPROPERTIES
+    
+    METHODS
+      SOURCE #checkValues
+        #boolean checkValues(LedgerJournalTrans  _ledgerJournalTrans = null,
+        #                    RunbaseProgress     _progress           = null)
+        #
+        #{
+        #    boolean ok = true;
+        #
+        #    ok = super(_ledgerJournalTrans, _progress);
+        #
+        #    if (!_ledgerJournalTrans.PaymReference)
+        #    {
+        #        ok = checkFailed("@SYS24523");
+        #    }
+        #    else
+        #    {
+        #        info(strfmt('Passed'));
+        #    }
+        #
+        #    return ok;
+        #}
+      ENDSOURCE
+      SOURCE #classDeclaration
+        #class CEHVendOutPaymRecordWireTransfer extends VendOutPaymRecord
+        #{
+        #}
+      ENDSOURCE
+      SOURCE #interfaceName
+        #public PaymInterfaceName interfaceName()
+        #{
+        #    return '@CEH40';
+        #}
+      ENDSOURCE
+      SOURCE #output
+        #void output()
+        #{
+        #    container   outRecord;
+        #
+        #    paymStatus = CustVendPaymStatus::None;
+        #
+        #    outRecord = conins(outRecord, 2 ,'Wire Xfer');
+        #
+        #    outRecord = conins(outRecord, 3, 'EST');
+        #    outRecord = conins(outRecord, 4, 'C');
+        #
+        #    outRecord = conins(outRecord, 5, 'AEU');
+        #    outRecord = conins(outRecord, 6, 'D');
+        #
+        #    outRecord = conins(outRecord, 7, 'ZGZ');
+        #
+        #    outRecord = conins(outRecord, 8, 'ZGZ');
+        #
+        #    outRecord = conins(outRecord, 9, 'CEH');
+        #    outRecord = conins(outRecord, 10, 'BOQ');
+        #
+        #    outRecord = conins(outRecord, 11, 'US');
+        #
+        #
+        #    file.writeExp(outRecord);
+        #}
+      ENDSOURCE
+    ENDMETHODS
+  ENDCLASS
+
+***Element: END
